@@ -1,0 +1,117 @@
+MIGRATION PROCESS
+See GITHUB PR for process on migrating old passwords into new database
+
+Once tables are migrated, sequence counters for table pks need to be reset on tables that have had imports (so that Django does not try to reassign used pks)
+ python manage.py sqlsequencereset app_name -> necessary for users, projects and optimization (look for migrated tables)
+then paste command for corresponding tables into python manage.py dbshell
+OR
+python manage.py sqlsequencereset optimization | python manage.py dbshell to automatically pipe the db commands into shell
+
+DUMP THE LOCAL DATABASE (where all the tables have been correctly imported)
+pg_dump -Fc --clean --no-owner -h localhost -p 5432 -U postgres -d ogp_migration_test > ogp_restore.sql
+RESTORE ON CAPROVER (first set up port mappig in configuration)
+pg_restore -h 195.201.165.5 -p 12345 -U offgridplanner -d offgridplanner --clean --single-transaction --no-owner "ogp_restore.sql"
+
+
+MIGRATION COMMANDS/ORDER
+FIRST
+
+projects_options --command " "\\copy public.projects_options (id, email_notification, do_demand_estimation, do_grid_optimization, do_es_design_optimization) FROM 'C:/...CSV' DELIMITER ';' CSV HEADER QUOTE '\"' ESCAPE '''';""
+
+users_users--command " "\\copy public.users_user (id, password, last_login, is_superuser, email, is_staff, is_active, date_joined, name) FROM 'C:...CSV' DELIMITER ';' CSV HEADER QUOTE '\"' ESCAPE '''';""
+
+THEN
+
+projects_project (else will fail because of ForeignKeys) --command " "\\copy public.projects_project (id, name, description, date_created, date_updated, interest_rate, lifetime, start_date, temporal_resolution, n_days, options_id, user_id) FROM 'C:/...CSV' DELIMITER ';' CSV HEADER QUOTE '\"' ESCAPE '''';""
+
+THEN ALL JSON FIELD TABLES -> DIFFERENT DELIMITER AND ESCAPE CHARACTER
+
+optimization_nodes "\\copy public.optimization_nodes (id, data, project_id) FROM 'C:/Users/PAULA~1.PRE/DOWNLO~1/DB_EXP~1/POSTGR~1/OPTIMI~1.CSV' DELIMITER ',' CSV HEADER QUOTE '\"' ESCAPE '\"';""
+
+THEN DEMAND
+
+--command " "\\copy public.steps_customdemand (id, very_low, low, middle, high, very_high, annual_total_consumption, annual_peak_consumption, project_id, uploaded_data) FROM 'C:/Users/PAULA~1.PRE/DOWNLO~1/DB_EXP~1/POSTGR~1/STEPS_~1.CSV' DELIMITER ',' CSV HEADER QUOTE '\"' ESCAPE '\"';""
+
+THEN ENERGY SYSTEM DESIGN 
+
+--command " "\\copy public.steps_energysystemdesign (id, battery__settings__is_selected, battery__settings__design, battery__parameters__nominal_capacity, battery__parameters__lifetime, battery__parameters__capex, battery__parameters__opex, battery__parameters__soc_min, battery__parameters__soc_max, battery__parameters__c_rate_in, battery__parameters__c_rate_out, battery__parameters__efficiency, diesel_genset__settings__is_selected, diesel_genset__settings__design, diesel_genset__parameters__nominal_capacity, diesel_genset__parameters__lifetime, diesel_genset__parameters__capex, diesel_genset__parameters__opex, diesel_genset__parameters__variable_cost, diesel_genset__parameters__fuel_cost, diesel_genset__parameters__fuel_lhv, diesel_genset__parameters__min_load, diesel_genset__parameters__max_load, diesel_genset__parameters__min_efficiency, diesel_genset__parameters__max_efficiency, inverter__settings__is_selected, inverter__settings__design, inverter__parameters__nominal_capacity, inverter__parameters__lifetime, inverter__parameters__capex, inverter__parameters__opex, inverter__parameters__efficiency, pv__settings__is_selected, pv__settings__design, pv__parameters__nominal_capacity, pv__parameters__lifetime, pv__parameters__capex, pv__parameters__opex, rectifier__settings__is_selected, rectifier__settings__design, rectifier__parameters__nominal_capacity, rectifier__parameters__lifetime, rectifier__parameters__capex, rectifier__parameters__opex, rectifier__parameters__efficiency, shortage__parameters__max_shortage_total, shortage__parameters__max_shortage_timestep, shortage__parameters__shortage_penalty_cost, project_id, shortage__settings__is_selected) FROM 'C:/Users/PAULA~1.PRE/DOWNLO~1/DB_EXP~1/POSTGR~1/STEPS_~2.CSV' DELIMITER ',' CSV HEADER QUOTE '\"' ESCAPE '\"';""
+
+GRID DESIGN
+--command " "\\copy public.steps_griddesign (id, distribution_cable__lifetime, distribution_cable__capex, distribution_cable__max_length, connection_cable__lifetime, connection_cable__capex, connection_cable__max_length, pole__lifetime, pole__capex, pole__max_n_connections, mg__connection_cost, shs__include, shs__max_grid_cost, project_id) FROM 'C:/Users/PAULA~1.PRE/DOWNLO~1/DB_EXP~1/POSTGR~1/STEPS_~3.CSV' DELIMITER ',' CSV HEADER QUOTE '\"' ESCAPE '\"';""
+
+--command " "\\copy public.optimization_results (id, n_consumers, n_shs_consumers, n_poles, n_distribution_links, n_connection_links, length_distribution_cable, average_length_distribution_cable, length_connection_cable, average_length_connection_cable, cost_grid, cost_shs, lcoe, res, shortage_total, surplus_rate, cost_renewable_assets, cost_non_renewable_assets, cost_fuel, pv_capacity, battery_capacity, inverter_capacity, rectifier_capacity, diesel_genset_capacity, peak_demand, surplus, fuel_to_diesel_genset, diesel_genset_to_rectifier, diesel_genset_to_demand, rectifier_to_dc_bus, pv_to_dc_bus, battery_to_dc_bus, dc_bus_to_battery, dc_bus_to_inverter, dc_bus_to_surplus, inverter_to_demand, time_grid_design, time_energy_system_design, \"time\", co2_savings, max_voltage_drop, infeasible, average_annual_demand_per_consumer, total_annual_consumption, upfront_invest_grid, upfront_invest_diesel_genset, upfront_invest_inverter, upfront_invest_rectifier, upfront_invest_battery, upfront_invest_pv, co2_emissions, fuel_consumption, base_load, max_shortage, epc_total, epc_pv, epc_diesel_genset, epc_inverter, epc_rectifier, epc_battery, simulation_id, lcoe_share_grid, lcoe_share_supply, upfront_invest_total) FROM 'C:/Users/PAULA~1.PRE/DOWNLO~1/DB_EXP~1/POSTGR~1/OP2DC5~1.CSV' DELIMITER ',' CSV HEADER QUOTE '\"' ESCAPE '\"';""
+
+
+-----------------------------------------
+
+projectsetup INTO projects_project
+id -> user_id
+project_name -> name
+project_description -> description
+created_at -> date_created
+updated_at -> date_updated
+interest_rate SAME
+project_lifetime -> lifetime
+start_date -> start_date
+temporal_resolution SAME
+n_days SAME
+
+
+projectsetup INTO projects_options
+status --> REMOVED, status_grid and status_supply in optimization_simulation instead
+email_notification SAME INT TO BOOL
+do_demand_estimation SAME INT TO BOOL
+do_grid_optimization SAME INT TO BOOL
+do_es_design_optimization SAME INT TO BOOL
+
+-------------------------
+
+user INTO users_user
+id SAME
+email SAME
+hashed_password -> password (added BCrypt hasher in Django PASSWORD_HASHERS and added bcrypt_legacy to passwords in db) -> Users can now log in with their old password, after first login password encryption changes to argon
+is_confirmed --> REMOVED
+is_active SAME INT TO BOOL --> set TRUE for all, as inactive users won't be able to authenticate
+is_superuser SAME INT TO BOOL
+task_id --> REMOVED, integrated into optimization_simulation tokens instead
+project_id --> REMOVED, not sure what this would be needed for
+show_tutorial --> CURRENTLY NOT IMPLEMENTED
+
+---------------------------
+
+nodes INTO optimization_nodes
+id (user_id) and project_id INTO id --> replace unique proj+user ID with unique proj ID (before a proj ID could be used multiple times)
+
+SAME FOR ALL JSON TABLES
+links INTO optimization_links
+demandcoverage INTO optimization_demandcoverage
+durationcurve INTO optimization_durationcurve
+emissions INTO optimization_emissions
+
+------------------------------
+demand AND customdemand INTO steps_customdemand
+
+id (user_id) and project_id INTO id --> replace unique proj+user ID with unique proj ID
+household_option REMOVED -> not sure what this field was for
+maximum_peak_load INTO annual_peak_load
+average_daily_energy INTO annual_total_consumption
+use_custom_shares REMOVED -> shares are always used
+custom_share_1 INTO very_low, divided by 100
+custom_share_2 INTO low, divided by 100
+custom_share_3 INTO middle, divided by 100
+custom_share_4 INTO high, divided by 100
+custom_share_5 INTO very_high, divided by 100
+use_custom_demand REMOVED -> custom demand is used if uploaded
+data (from customdemand table) INTO uploaded_data
+
+-----------------------------------
+
+ENERGYSYSTEMDESIGN 
+ALL ROWS STAY, IS_SELECTED, LIFETIME TO BOOL
+
+GRIDDESIGN 
+SEE PROCESS SCRIPT
+
+RESULTS
+SEE PROCESS SCRIPT
+
