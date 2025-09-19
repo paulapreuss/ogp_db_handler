@@ -24,6 +24,8 @@ for col in table_reformat.columns:
         table_reformat[col] = table_reformat[col].apply(lambda x: bool(int(x)))
     elif "lifetime" in col or col == "project_id":
         table_reformat[col] = table_reformat[col].apply(lambda x: int(x))
+    elif "efficiency" in col:
+        table_reformat[col] = table_reformat[col].apply(lambda x: float(x)) * 100
     else:
         table_reformat[col] = table_reformat[col].apply(lambda x: float(x))
 
